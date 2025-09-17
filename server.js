@@ -13,10 +13,11 @@ const videoRoutes = require('./routes/videos');
 const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
 const analyticsRoutes = require('./routes/analytics');
+const adsRoutes = require('./routes/ads');
 
-// Import middleware
-const errorHandler = require('./middleware/errorHandler');
-const { seedDatabase } = require('./scripts/seedDatabase');
+// Import middleware - FIXED: destructured import
+const { errorHandler, notFound } = require('./middleware/errorHandler');
+const { autoSeed } = require('./scripts/seedDatabase');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,91 +59,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/videomax'
 })
 .then(async () => {
   console.log('📊 Connected to MongoDB');
-  // Seed database with initial data in development
-  if (process.env.NODE_ENV === 'development') {
-    await seedDatabase();
-  }
+  // Auto-seed database with initial data if needed
+  await autoSeed();
 })
 .catch((err) => {
-  console.error('❌ MongoDB connection error:', err);
-  process.exit(1);
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/videos', videoRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/analytics', analyticsRoutes);
-
-// Welcome endpoint
-app.get('/api', (req, res) => {
-  res.json({
-    message: '🎬 Welcome to VideoMax API',
-    version: '1.0.0',
-    author: 'MiniMax Agent',
-    documentation: '/api/docs',
-    endpoints: {
-      auth: '/api/auth',
-      users: '/api/users',
-      videos: '/api/videos',
-      admin: '/api/admin',
-      upload: '/api/upload',
-      analytics: '/api/analytics'
-    }
-  });
-});
-
-// Error handling middleware (must be last)
-app.use(errorHandler);
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    message: 'The requested resource does not exist'
-  });
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('\n👋 SIGTERM received. Shutting down gracefully...');
-  mongoose.connection.close(() => {
-    console.log('📊 MongoDB connection closed.');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 SIGINT received. Shutting down gracefully...');
-  mongoose.connection.close(() => {
-    console.log('📊 MongoDB connection closed.');
-    process.exit(0);
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`\n🚀 VideoMax Backend Server running on port ${PORT}`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📱 API Base URL: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-  console.log('\n📋 Available Endpoints:');
-  console.log('   • Auth: /api/auth');
-  console.log('   • Users: /api/users');
-  console.log('   • Videos: /api/videos');
-  console.log('   • Admin: /api/admin');
-  console.log('   • Upload: /api/upload');
-  console.log('   • Analytics: /api/analytics');
-  console.log('\n✅ Server ready to handle requests!');
-});
+  console.error
