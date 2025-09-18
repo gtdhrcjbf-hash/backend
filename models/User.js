@@ -3,23 +3,38 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
-    required: true,
-    unique: true,
+    required: false,
+    unique: false,
     trim: true,
     minlength: 3,
     maxlength: 30
   },
   email: {
     type: String,
-    required: true,
-    unique: true,
+    required: false,
+    unique: false,
     lowercase: true,
+    trim: true
+  },
+  phone: {
+    type: String,
+    required: false,
+    unique: false,
     trim: true
   },
   password: {
     type: String,
-    required: true,
+    required: false,
     minlength: 6
+  },
+  provider: {
+    type: String,
+    enum: ['local', 'google', 'facebook', 'apple'],
+    default: 'local'
+  },
+  providerId: {
+    type: String,
+    default: null
   },
   role: {
     type: String,

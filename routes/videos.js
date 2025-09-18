@@ -61,35 +61,37 @@ router.get('/', async (req, res) => {
 });
 
 // @route   GET /api/videos/:id
-// @desc    Get single video
+// @desc    Get video by ID
 // @access  Public
 router.get('/:id', async (req, res) => {
   try {
-    const video = await Video.findById(req.params.id)
-      .populate('uploadedBy', 'username avatar subscribers')
-      .populate('comments.user', 'username avatar');
-
-    if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: 'Video not found'
-      });
+    const video = await Video.findById(req.params.id);
+    if (!video || video.isPrivate) {
+      return res.status(404).json({ success: false, message: 'Video not found' });
     }
-
-    // Increment views
-    video.views += 1;
-    await video.save();
-
-    res.json({
-      success: true,
-      data: video
-    });
+    res.json({ success: true, data: video });
   } catch (error) {
-    console.error('Get video error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch video' });
+  }
+});
+
+// @route   GET /api/videos/search
+// @desc    Search videos by title, tags, or category
+// @access  Public
+router.get('/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    const query = q ? {
+      $or: [
+        { title: { $regex: q, $options: 'i' } },
+        { tags: { $regex: q, $options: 'i' } },
+        { category: { $regex: q, $options: 'i' } }
+      ]
+    } : {};
+    const videos = await Video.find({ ...query, isPrivate: false });
+    res.json({ success: true, data: videos });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Search failed' });
   }
 });
 

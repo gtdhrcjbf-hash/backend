@@ -44,6 +44,14 @@ const videoSchema = new mongoose.Schema({
     trim: true,
     maxlength: 100
   },
+  convertedVideos: {
+    type: Object,
+    default: {}
+  },
+  hlsStreams: {
+    type: Object,
+    default: {}
+  },
   description: {
     type: String,
     maxlength: 1000,

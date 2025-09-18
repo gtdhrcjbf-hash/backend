@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { auth } = require('../middleware/auth');
 const Video = require('../models/Video');
+const { convertVideo, resolutions } = require('../services/videoProcessor');
 
 const router = express.Router();
 
@@ -172,7 +173,7 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
 });
 
 // @route   POST /api/upload/complete
-// @desc    Complete video upload with metadata
+// @desc    Complete video upload with metadata and convert to multiple resolutions
 // @access  Private
 router.post('/complete', auth, upload.fields([
   { name: 'video', maxCount: 1 },
@@ -194,6 +195,21 @@ router.post('/complete', auth, upload.fields([
     const videoUrl = `/uploads/videos/${videoFile.filename}`;
     const thumbnailUrl = thumbnailFile ? `/uploads/thumbnails/${thumbnailFile.filename}` : null;
 
+    // Convert video to multiple resolutions
+    const convertedDir = path.join(uploadsDir, 'converted', videoFile.filename.split('.')[0]);
+    await new Promise((resolve, reject) => {
+      convertVideo(videoFile.path, convertedDir, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Build converted video URLs
+    const convertedVideos = {};
+    resolutions.forEach(res => {
+      convertedVideos[res.name] = `/uploads/converted/${videoFile.filename.split('.')[0]}/${res.name}.mp4`;
+    });
+
     // Create video document
     const video = new Video({
       title,
@@ -206,19 +222,19 @@ router.post('/complete', auth, upload.fields([
       uploadedBy: req.user.id,
       filename: videoFile.filename,
       fileSize: videoFile.size,
-      mimeType: videoFile.mimetype
+      mimeType: videoFile.mimetype,
+      convertedVideos // new field for adaptive streaming
     });
 
     await video.save();
 
     res.status(201).json({
       success: true,
-      message: 'Video uploaded and saved successfully',
+      message: 'Video uploaded, converted, and saved successfully',
       data: video
     });
   } catch (error) {
     console.error('Complete upload error:', error);
-    
     // Clean up uploaded files if database save fails
     if (req.files) {
       Object.values(req.files).flat().forEach(file => {
@@ -227,7 +243,6 @@ router.post('/complete', auth, upload.fields([
         }
       });
     }
-
     res.status(500).json({
       success: false,
       message: 'Failed to complete upload'

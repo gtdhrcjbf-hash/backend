@@ -11,9 +11,12 @@ const router = express.Router();
 // @desc    Register a new user
 // @access  Public
 router.post('/register', [
-  body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
-  body('email').isEmail().withMessage('Invalid email'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('username').optional().trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
+  body('email').optional().isEmail().withMessage('Invalid email'),
+  body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
+  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('provider').optional().isIn(['local', 'google', 'facebook', 'apple']).withMessage('Invalid provider'),
+  body('providerId').optional().isString()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -25,29 +28,42 @@ router.post('/register', [
       });
     }
 
-    const { username, email, password } = req.body;
+    const { username, email, phone, password, provider, providerId } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
+      $or: [
+        email ? { email } : {},
+        username ? { username } : {},
+        phone ? { phone } : {},
+        providerId ? { providerId } : {}
+      ]
     });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email or username'
+        message: 'User already exists with this email, username, phone, or social account'
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    let hashedPassword = undefined;
+    if (provider === 'local' || !provider) {
+      if (!password) {
+        return res.status(400).json({ success: false, message: 'Password required for local registration' });
+      }
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(password, salt);
+    }
 
     // Create user
     const user = new User({
       username,
       email,
-      password: hashedPassword
+      phone,
+      password: hashedPassword,
+      provider: provider || 'local',
+      providerId: providerId || null
     });
 
     await user.save();
@@ -88,8 +104,11 @@ router.post('/register', [
 // @desc    Login user
 // @access  Public
 router.post('/login', [
-  body('email').isEmail().withMessage('Invalid email'),
-  body('password').exists().withMessage('Password is required')
+  body('email').optional().isEmail().withMessage('Invalid email'),
+  body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
+  body('provider').optional().isIn(['local', 'google', 'facebook', 'apple']).withMessage('Invalid provider'),
+  body('providerId').optional().isString(),
+  body('password').optional().isLength({ min: 6 }).withMessage('Password is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -101,24 +120,41 @@ router.post('/login', [
       });
     }
 
-    const { email, password } = req.body;
+    const { email, phone, password, provider, providerId } = req.body;
 
-    // Check if user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    // Find user by email, phone, or providerId
+    let user;
+    if (provider && provider !== 'local') {
+      user = await User.findOne({ provider, providerId });
+      if (!user) {
+        return res.status(400).json({ success: false, message: 'Social account not registered' });
+      }
+    } else if (phone) {
+      user = await User.findOne({ phone });
+      if (!user) {
+        return res.status(400).json({ success: false, message: 'Phone not registered' });
+      }
+      if (!user.password) {
+        return res.status(400).json({ success: false, message: 'Phone login not supported for social accounts' });
+      }
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Invalid credentials' });
+      }
+    } else if (email) {
+      user = await User.findOne({ email });
+      if (!user) {
+        return res.status(400).json({ success: false, message: 'Email not registered' });
+      }
+      if (!user.password) {
+        return res.status(400).json({ success: false, message: 'Email login not supported for social accounts' });
+      }
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Invalid credentials' });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Missing login credentials' });
     }
 
     // Update last login
