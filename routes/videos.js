@@ -3,6 +3,8 @@ const { body, validationResult } = require('express-validator');
 const Video = require('../models/Video');
 const User = require('../models/User');
 const { auth, adminAuth } = require('../middleware/auth');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -467,6 +469,48 @@ router.get('/trending', async (req, res) => {
       success: false,
       message: 'Server error'
     });
+  }
+});
+
+// @route   GET /api/videos/:id/hls/:resolution/index.m3u8
+// @desc    Serve HLS playlist for a video resolution
+// @access  Public
+router.get('/:id/hls/:resolution/index.m3u8', async (req, res) => {
+  try {
+    const { id, resolution } = req.params;
+    const video = await Video.findById(id);
+    if (!video || video.isPrivate) {
+      return res.status(404).send('Video not found');
+    }
+    const hlsPath = path.join(__dirname, `../uploads/converted/${video.filename.split('.')[0]}/${resolution}_hls/index.m3u8`);
+    if (!fs.existsSync(hlsPath)) {
+      return res.status(404).send('HLS playlist not found');
+    }
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    fs.createReadStream(hlsPath).pipe(res);
+  } catch (error) {
+    res.status(500).send('Failed to serve HLS playlist');
+  }
+});
+
+// @route   GET /api/videos/:id/hls/:resolution/:segment
+// @desc    Serve HLS segment (.ts) for a video resolution
+// @access  Public
+router.get('/:id/hls/:resolution/:segment', async (req, res) => {
+  try {
+    const { id, resolution, segment } = req.params;
+    const video = await Video.findById(id);
+    if (!video || video.isPrivate) {
+      return res.status(404).send('Video not found');
+    }
+    const segmentPath = path.join(__dirname, `../uploads/converted/${video.filename.split('.')[0]}/${resolution}_hls/${segment}`);
+    if (!fs.existsSync(segmentPath)) {
+      return res.status(404).send('Segment not found');
+    }
+    res.setHeader('Content-Type', 'video/MP2T');
+    fs.createReadStream(segmentPath).pipe(res);
+  } catch (error) {
+    res.status(500).send('Failed to serve HLS segment');
   }
 });
 
