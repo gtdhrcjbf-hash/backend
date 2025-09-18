@@ -7,6 +7,8 @@ const { auth, adminAuth } = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
 const { moderateText } = require('../services/moderationAI');
+const { generateDRMToken } = require('../services/drm');
+const { getCDNUrl } = require('../services/cdn');
 
 const router = express.Router();
 
@@ -548,6 +550,34 @@ router.get('/analytics/my', auth, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
+  }
+});
+
+// @route   GET /api/videos/:id/drm-token
+// @desc    Get DRM token for video playback
+// @access  Private
+router.get('/:id/drm-token', auth, async (req, res) => {
+  try {
+    const token = generateDRMToken(req.user.id, req.params.id);
+    res.json({ success: true, token });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to generate DRM token' });
+  }
+});
+
+// @route   GET /api/videos/:id/cdn-url
+// @desc    Get CDN URL for video streaming
+// @access  Public
+router.get('/:id/cdn-url', async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video || video.isPrivate) {
+      return res.status(404).json({ success: false, message: 'Video not found' });
+    }
+    const cdnUrl = getCDNUrl(video.videoUrl);
+    res.json({ success: true, cdnUrl });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to get CDN URL' });
   }
 });
 

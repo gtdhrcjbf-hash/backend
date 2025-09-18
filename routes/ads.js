@@ -57,73 +57,55 @@ router.get('/position/:position', async (req, res) => {
 });
 
 // @route   POST /api/ads
-// @desc    Create new ad (Admin only)
-// @access  Private - Admin
-router.post('/', [
-  adminAuth,
-  body('title').trim().isLength({ min: 1, max: 100 }).withMessage('Title must be 1-100 characters'),
-  body('description').optional().isLength({ max: 500 }).withMessage('Description must not exceed 500 characters'),
-  body('imageUrl').isURL().withMessage('Invalid image URL'),
-  body('targetUrl').isURL().withMessage('Invalid target URL'),
-  body('position').isIn(['banner', 'sidebar', 'popup', 'video-overlay']).withMessage('Invalid position'),
-  body('startDate').isISO8601().withMessage('Invalid start date'),
-  body('endDate').isISO8601().withMessage('Invalid end date'),
-  body('priority').optional().isInt({ min: 1, max: 10 }).withMessage('Priority must be between 1-10')
-], async (req, res) => {
+// @desc    Create a new ad (admin)
+// @access  Admin
+router.post('/', adminAuth, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const {
-      title,
-      description,
-      imageUrl,
-      targetUrl,
-      position,
-      startDate,
-      endDate,
-      priority = 5
-    } = req.body;
-
-    // Check if end date is after start date
-    if (new Date(endDate) <= new Date(startDate)) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date must be after start date'
-      });
-    }
-
-    const ad = new Ad({
-      title,
-      description,
-      imageUrl,
-      targetUrl,
-      position,
-      startDate,
-      endDate,
-      priority,
-      createdBy: req.user.id
-    });
-
+    const ad = new Ad(req.body);
     await ad.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Ad created successfully',
-      data: ad
-    });
+    res.status(201).json({ success: true, data: ad });
   } catch (error) {
-    console.error('Create ad error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Failed to create ad' });
+  }
+});
+
+// @route   GET /api/ads/active/:position
+// @desc    Get active ads by position (pre-roll, mid-roll, banner)
+// @access  Public
+router.get('/active/:position', async (req, res) => {
+  try {
+    const ads = await Ad.findActiveByPosition(req.params.position);
+    res.json({ success: true, data: ads });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch ads' });
+  }
+});
+
+// @route   POST /api/ads/:id/impression
+// @desc    Record ad impression
+// @access  Public
+router.post('/:id/impression', async (req, res) => {
+  try {
+    const ad = await Ad.findById(req.params.id);
+    if (!ad) return res.status(404).json({ success: false, message: 'Ad not found' });
+    await ad.recordImpression();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to record impression' });
+  }
+});
+
+// @route   POST /api/ads/:id/click
+// @desc    Record ad click
+// @access  Public
+router.post('/:id/click', async (req, res) => {
+  try {
+    const ad = await Ad.findById(req.params.id);
+    if (!ad) return res.status(404).json({ success: false, message: 'Ad not found' });
+    await ad.recordClick();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to record click' });
   }
 });
 
@@ -196,68 +178,6 @@ router.delete('/:id', adminAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Delete ad error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-// @route   POST /api/ads/:id/click
-// @desc    Track ad click
-// @access  Public
-router.post('/:id/click', async (req, res) => {
-  try {
-    const ad = await Ad.findById(req.params.id);
-
-    if (!ad) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ad not found'
-      });
-    }
-
-    // Increment click count
-    ad.clicks = (ad.clicks || 0) + 1;
-    await ad.save();
-
-    res.json({
-      success: true,
-      message: 'Click tracked successfully'
-    });
-  } catch (error) {
-    console.error('Track ad click error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-// @route   POST /api/ads/:id/impression
-// @desc    Track ad impression
-// @access  Public
-router.post('/:id/impression', async (req, res) => {
-  try {
-    const ad = await Ad.findById(req.params.id);
-
-    if (!ad) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ad not found'
-      });
-    }
-
-    // Increment impression count
-    ad.impressions = (ad.impressions || 0) + 1;
-    await ad.save();
-
-    res.json({
-      success: true,
-      message: 'Impression tracked successfully'
-    });
-  } catch (error) {
-    console.error('Track ad impression error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
