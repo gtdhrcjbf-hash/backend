@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+  viewsHistory: [{
+    date: { type: Date, required: true },
+    count: { type: Number, default: 0 }
+  }],
   username: {
     type: String,
     required: false,

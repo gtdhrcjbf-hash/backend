@@ -5,6 +5,7 @@ const fs = require('fs');
 const { auth } = require('../middleware/auth');
 const Video = require('../models/Video');
 const { convertVideo, resolutions } = require('../services/videoProcessor');
+const { moderateVideo } = require('../services/moderationAI');
 
 const router = express.Router();
 
@@ -209,6 +210,15 @@ router.post('/complete', auth, upload.fields([
     resolutions.forEach(res => {
       convertedVideos[res.name] = `/uploads/converted/${videoFile.filename.split('.')[0]}/${res.name}.mp4`;
     });
+
+    // AI moderation check for video
+    const moderationResult = await moderateVideo(videoFile.path);
+    if (moderationResult.flagged) {
+      return res.status(400).json({
+        success: false,
+        message: `Video flagged for moderation: ${moderationResult.reason}`
+      });
+    }
 
     // Create video document
     const video = new Video({

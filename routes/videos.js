@@ -2,9 +2,11 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Video = require('../models/Video');
 const User = require('../models/User');
+const Payout = require('../models/Payout');
 const { auth, adminAuth } = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
+const { moderateText } = require('../services/moderationAI');
 
 const router = express.Router();
 
@@ -359,6 +361,15 @@ router.post('/:id/comment', [
   body('text').trim().isLength({ min: 1, max: 500 }).withMessage('Comment must be 1-500 characters')
 ], async (req, res) => {
   try {
+    // AI moderation check for comment text
+    const moderationResult = await moderateText(req.body.text);
+    if (moderationResult.flagged) {
+      return res.status(400).json({
+        success: false,
+        message: `Comment flagged for moderation: ${moderationResult.reason}`
+      });
+    }
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -511,6 +522,32 @@ router.get('/:id/hls/:resolution/:segment', async (req, res) => {
     fs.createReadStream(segmentPath).pipe(res);
   } catch (error) {
     res.status(500).send('Failed to serve HLS segment');
+  }
+});
+
+// @route   GET /api/videos/analytics/my
+// @desc    Get my analytics (views, fans, earnings)
+// @access  Private
+router.get('/analytics/my', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const fans = user.subscribers.length;
+    const views = user.viewsHistory.reduce((sum, v) => sum + v.count, 0);
+    const earnings = await Payout.aggregate([
+      { $match: { creator: user._id, status: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    res.json({
+      success: true,
+      data: {
+        fans,
+        views,
+        earnings: earnings[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
   }
 });
 
