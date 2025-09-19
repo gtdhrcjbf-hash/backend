@@ -1,0 +1,22 @@
+{
+  "name": "videomax-frontend",
+  "version": "1.0.0",
+  "description": "VideoMax Platform Frontend - Static Site",
+  "main": "public/index.html",
+  "scripts": {
+    "build": "echo 'Static files ready for deployment'",
+    "start": "echo 'Static site deployed successfully'"
+  },
+  "keywords": [
+    "video",
+    "platform",
+    "frontend",
+    "static",
+    "render"
+  ],
+  "author": "VideoMax Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
