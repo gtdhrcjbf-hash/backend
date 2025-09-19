@@ -77,6 +77,24 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/videomax'
   process.exit(1);
 });
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: '🎬 VideoMax API Server',
+    version: '1.0.0',
+    status: 'Running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      auth: '/api/auth',
+      videos: '/api/videos',
+      admin: '/api/admin'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
