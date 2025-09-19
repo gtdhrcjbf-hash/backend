@@ -39,7 +39,13 @@ app.use('/api', limiter);
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000', 'http://localhost:3001'],
+  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [
+    'http://localhost:3000', 
+    'http://localhost:3001',
+    'https://videomax-admin.onrender.com',
+    'https://videomax-users.onrender.com',
+    'https://videomax-frontend.onrender.com'
+  ],
   credentials: true,
   optionsSuccessStatus: 200
 };
