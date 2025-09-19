@@ -1,4 +1,6 @@
-# VideoMax Backend API
+# VideoMax Users Platform
+
+Complete user interface for VideoMax video platform.
 
 A comprehensive Node.js/Express backend supporting both admin dashboard and user platform frontends.
 
