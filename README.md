@@ -1,4 +1,6 @@
-# VideoMax Backend API
+# VideoMax Admin Panel
+
+Complete admin interface for VideoMax platform management.
 
 A comprehensive Node.js/Express backend supporting both admin dashboard and user platform frontends.
 
